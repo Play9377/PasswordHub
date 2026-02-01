@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账号管家 Pro - 2026 护眼版</title>
+    <style>
+        /* 1. 定义两套主题配色 */
+        :root {
+            /* 默认深色主题 (深夜视界) */
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --primary: #6366f1;
+            --border: #334155;
+            --input-bg: #0f172a;
+            --tag-bg: rgba(99, 102, 241, 0.15);
+        }
+
+        [data-theme="light"] {
+            /* 护眼淡色主题 (晨曦米色) */
+            --bg: #f5f5dc; /* 米杏色底，极低蓝光 */
+            --card: #ffffff;
+            --text: #4a4a4a;
+            --primary: #556b2f; /* 橄榄绿，视觉放松 */
+            --border: #dcdcdc;
+            --input-bg: #fafafa;
+            --tag-bg: #e8f3e8; /* 豆沙绿标签 */
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; transition: background-color 0.3s, color 0.3s; }
+        body { font-family: 'PingFang SC', system-ui, sans-serif; background-color: var(--bg); color: var(--text); padding: 20px; display: flex; justify-content: center; }
+
+        .container { width: 100%; max-width: 1000px; background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        h1 { color: var(--primary); font-size: 1.5rem; }
+
+        /* 输入面板 */
+        .input-panel {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 1fr 1fr auto;
+            gap: 10px;
+            margin-bottom: 25px;
+            background: rgba(128, 128, 128, 0.05);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid var(--border);
+        }
+
+        input {
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--input-bg);
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+        }
+
+        input:focus { border-color: var(--primary); }
+
+        /* 按钮 */
+        .btn { padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .btn-add { background: var(--primary); color: white; }
+        .btn-theme { background: #eab308; color: #fff; } /* 橙黄色主题按钮 */
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-toggle { background: #64748b; color: white; }
+
+        /* 表格样式 */
+        .table-scroll { overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; min-width: 700px; }
+        th { text-align: left; padding: 15px; font-size: 13px; color: #888; border-bottom: 2px solid var(--border); }
+        td { padding: 15px; border-bottom: 1px solid var(--border); font-size: 14px; }
+        
+        .url-link { color: #3b82f6; text-decoration: none; }
+        .url-link:hover { text-decoration: underline; }
+        .platform-tag { background: var(--tag-bg); color: var(--primary); padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+        .pass-text { font-family: monospace; letter-spacing: 1px; }
+
+        @media (max-width: 850px) {
+            .input-panel { grid-template-columns: 1fr 1fr; }
+            .btn-add { grid-column: span 2; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>🔐 2026 账号管家 Pro</h1>
+        <button class="btn btn-theme" onclick="toggleTheme()">🌓 切换护眼模式</button>
+    </div>
+
+    <!-- 输入 -->
+    <div class="input-panel">
+        <input type="text" id="platform" placeholder="平台名称">
+        <input type="text" id="site" placeholder="网址 (可跳转)">
+        <input type="text" id="username" placeholder="账号">
+        <input type="text" id="password" placeholder="密码">
+        <button class="btn btn-add" onclick="addData()">添加记录</button>
+    </div>
+
+    <!-- 工具 -->
+    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+        <button class="btn btn-danger" onclick="deleteSelected()">删除选中</button>
+        <button class="btn btn-toggle" id="toggleBtn" onclick="togglePasswords()">显示所有密码</button>
+    </div>
+
+    <!-- 列表 -->
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="checkAll()"></th>
+                    <th>平台</th>
+                    <th>跳转网址</th>
+                    <th>账号</th>
+                    <th>密码</th>
+                </tr>
+            </thead>
+            <tbody id="dataTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let isVisible = false;
+    let accountData = JSON.parse(localStorage.getItem('vault_2026_eye')) || [];
+
+    // 初始化加载
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        renderTable();
+    });
+
+    // 主题切换
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const targetTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', targetTheme);
+        localStorage.setItem('theme', targetTheme);
+    }
+
+    // 网址链接化
+    function createLink(url) {
+        if (!url) return `<span style="color:#999">--</span>`;
+        let cleanUrl = url.trim();
+        if (!/^https?:\/\//i.test(cleanUrl)) cleanUrl = 'https://' + cleanUrl;
+        return `<a href="${cleanUrl}" target="_blank" class="url-link">🌐 直达</a>`;
+    }
+
+    function addData() {
+        const platform = document.getElementById('platform').value.trim();
+        const site = document.getElementById('site').value.trim();
+        const user = document.getElementById('username').value.trim();
+        const pass = document.getElementById('password').value.trim();
+
+        if (!platform || !user || !pass) return alert("请完整填写必要信息");
+
+        accountData.push({ id: Date.now(), platform, site, user, pass });
+        saveAndRender();
+        ['platform', 'site', 'username', 'password'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('dataTable');
+        tbody.innerHTML = accountData.length ? '' : `<tr><td colspan="5" style="text-align:center; padding:40px; color:#999;">空空如也，请添加记录...</td></tr>`;
+
+        accountData.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td style="text-align: center;"><input type="checkbox" class="row-check" value="${item.id}"></td>
+                <td><span class="platform-tag">${item.platform}</span></td>
+                <td>${createLink(item.site)}</td>
+                <td>${item.user}</td>
+                <td class="pass-text">${isVisible ? item.pass : '••••••••'}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function togglePasswords() {
+        isVisible = !isVisible;
+        document.getElementById('toggleBtn').innerText = isVisible ? "隐藏所有密码" : "显示所有密码";
+        renderTable();
+    }
+
+    function deleteSelected() {
+        const checkboxes = document.querySelectorAll('.row-check:checked');
+        if (!checkboxes.length || !confirm(`删除选中项目？`)) return;
+        const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        accountData = accountData.filter(item => !ids.includes(item.id));
+        saveAndRender();
+        document.getElementById('selectAll').checked = false;
+    }
+
+    function checkAll() {
+        document.querySelectorAll('.row-check').forEach(cb => cb.checked = document.getElementById('selectAll').checked);
+    }
+
+    function saveAndRender() {
+        localStorage.setItem('vault_2026_eye', JSON.stringify(accountData));
+        renderTable();
+    }
+</script>
+
+</body>
+</html>
